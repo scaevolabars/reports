@@ -1,0 +1,167 @@
+\documentclass[]{beamer}
+\usepackage{hyperref}
+
+
+% math
+\usepackage{amsmath}
+
+% tikz
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows}
+
+\usetheme[]{Frankfurt}
+
+\title{Differential programming}
+\author{Sergey Barseghyan
+\href{mailto:barseghyan@phystech.edu}{barseghyan@phystech.edu}}
+\date{16.08.2022}
+
+
+\begin{document}
+\begin{frame}
+    \maketitle
+\end{frame}
+
+\begin{frame}{Outline}
+    \tableofcontents
+\end{frame}
+
+
+\section{Non-linear optimization and SABR model}
+\subsection{Levenberg-Marquad}
+\begin{frame}
+    Levenberg-Marquad algorithm - is an optimization algorithm which is basically combination 
+    of two objective minimization algorithms: \textbf{Gauss-Newton} and
+    \textbf{Gradient Descent} 
+    It is very very well suited for the optimization problemsswhere model is \textbf{non-linear} in its parameters 
+\end{frame}
+
+\begin{frame}
+\frametitle{Non-linear least squares}
+
+    \begin{eqnarray*}
+        \hat{y}(t ; \boldsymbol{p}) & \text{- fitted model} \\
+        t \in \mathbb{R} & \text{- independent variable} \\
+        \left\{t_{i}, y_{i}\right\}^{m}_{i=1} & \text{- observed data points} \\
+        W_{ij} & \text{- inverse covariance matrix} \\
+        \boldsymbol{p} \in \mathbb{R}^n  & \text{model parameters}
+    \end{eqnarray*}
+    Optimized objective is nothing else but chi-squared statistic
+    \begin{eqnarray*}
+        \chi^{2}(\boldsymbol{p})
+         =\sum_{i=1}^{m}
+         \left[
+            \frac{y\left(t_{i}\right)-\hat{y}\left(t_{i} ; \boldsymbol{p}\right)}
+                 {\sigma_{y_{i}}}
+         \right]^{2} \\
+        =(\boldsymbol{y}-\boldsymbol{\hat{y}}(\boldsymbol{p}))^{\top}
+         \boldsymbol{W}
+         (\boldsymbol{y}-\hat{\boldsymbol{y}}(\boldsymbol{p}))
+    \end{eqnarray*}
+    
+\end{frame}
+
+\begin{frame}
+    \frametitle{Gradient Descent and Jacobian update}
+    Gradient Descent step update
+    \begin{eqnarray*}
+        %% Gradient descent
+        \frac{\partial}{\partial \boldsymbol{p}} \chi^{2}
+         = -2(\boldsymbol{y}-\hat{\boldsymbol{y}})^{\top} \boldsymbol{W} \boldsymbol{J} \\
+        %% GD - update
+        \boldsymbol{h}_{\mathrm{gd}}=\alpha \boldsymbol{J}^{\top} \boldsymbol{W}(\boldsymbol{y}-\hat{\boldsymbol{y}})
+    \end{eqnarray*}
+    Gauss-Newton step update
+    \begin{eqnarray*}
+        %% Gauss-Newton
+        \hat{\boldsymbol{y}}(\boldsymbol{p}+\boldsymbol{h})
+         \approx 
+        \hat{\boldsymbol{y}}(\boldsymbol{p})
+        + \left[
+            \frac{\partial \hat{\boldsymbol{y}}}{\partial \boldsymbol{p}}
+          \right] \boldsymbol{h}
+          = \hat{\boldsymbol{y}}+\boldsymbol{J} \boldsymbol{h} \\
+        %% Gauss-Newton update
+        \frac{\partial}{\partial \boldsymbol{h}}
+         \chi^{2}(\boldsymbol{p}+\boldsymbol{h})
+         \approx
+         -2(\boldsymbol{y}-\hat{\boldsymbol{y}})^{\top}
+        \boldsymbol{W} \boldsymbol{J}+2 \boldsymbol{h}^{\top} \boldsymbol{J}^{\top} \boldsymbol{W} \boldsymbol{J} \\
+        %%
+        \left[
+            \boldsymbol{J}^{\top} \boldsymbol{W} \boldsymbol{J}
+        \right] \boldsymbol{h}_{\mathrm{gn}}
+        =\boldsymbol{J}^{\top} \boldsymbol{W}(\boldsymbol{y}-\hat{\boldsymbol{y}})
+    \end{eqnarray*}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Levenberg-Marquad update}
+
+    \tikzstyle{rect} = [rectangle
+                        ,rounded corners
+                        ,minimum width=3cm
+                        ,minimum height=1cm
+                        ,text centered
+                        ,draw=black
+                        ]
+
+    \tikzstyle{circ} = [circle
+                        ,fill=white
+                        ,draw=black
+                       ]                    
+
+    \tikzstyle{arrow}=[thick,->,>=stealth]                    
+    \begin{tikzpicture}[]
+        % Nodes
+        \node[rect] (algo1) at (0, 4){Gradient Descent};
+        \node[rect] (algo2) at (8, 4) {Gauss Newton};
+        \node[rect] (algo3) at (4, 2.5) {Levenberg-Marquad};
+        \node[circ] (plus)  at (4, 4){+};
+
+        % Draw
+        \draw (algo1) edge (plus);
+        \draw (plus) edge (algo2);
+        \draw[arrow] (plus) -- (algo3);
+    \end{tikzpicture}   
+    
+    \begin{eqnarray*}
+        \left[\boldsymbol{J}^{\top} \boldsymbol{W} \boldsymbol{J}
+              +\lambda \operatorname{diag}\left(\boldsymbol{J}^{\top} \boldsymbol{W} \boldsymbol{J}\right)
+        \right]
+         \boldsymbol{h}_{\mathrm{lm}}
+         =\boldsymbol{J}^{\top} \boldsymbol{W}(\boldsymbol{y}-\hat{\boldsymbol{y}})
+    \end{eqnarray*}
+
+    \begin{eqnarray*}
+        \lambda \quad \text{is dumping parameter}
+    \end{eqnarray*}
+    
+\end{frame}
+
+
+\subsection{SABR model}
+
+\begin{frame}
+    \frametitle{Motivation for the model}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Model Definition}
+\end{frame}
+
+
+\begin{frame}
+    \frametitle{Exact solution}
+\end{frame}
+
+
+
+\subsection{}
+
+\section{Diffential programming for detectors}
+\begin{frame}
+   
+\end{frame}
+
+\end{document}
