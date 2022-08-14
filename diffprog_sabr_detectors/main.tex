@@ -1,6 +1,37 @@
 \documentclass[]{beamer}
 \usepackage{hyperref}
 
+%
+\usepackage{listings}
+\definecolor{codegreen}{rgb}{0,0.6,0}
+\definecolor{codegray}{rgb}{0.5,0.5,0.5}
+\definecolor{codepurple}{rgb}{0.58,0,0.82}
+\definecolor{backcolour}{rgb}{0.99,1.0,1.0}
+
+\lstdefinestyle{mystyle}{
+    backgroundcolor=\color{backcolour},   
+    commentstyle=\color{codegreen},
+    keywordstyle=\color{magenta},
+    numberstyle=\tiny\color{codegray},
+    stringstyle=\color{codepurple},
+    basicstyle=\ttfamily\scriptsize,
+    breakatwhitespace=false,         
+    breaklines=false,                 
+    captionpos=b,                    
+    keepspaces=true,                 
+    numbers=left,                    
+    numbersep=0pt,                  
+    showspaces=false,                
+    showstringspaces=false,
+    showtabs=false,                  
+    tabsize=2
+}
+
+\lstset{style=mystyle}
+
+
+% algo
+\usepackage{algorithm,algorithmic}
 
 % math
 \usepackage{amsmath}
@@ -134,10 +165,112 @@
     \end{eqnarray*}
 
     \begin{eqnarray*}
-        \lambda \quad \text{is dumping parameter}
+        \lambda \text{ is dumping parameter}
     \end{eqnarray*}
     
 \end{frame}
+
+
+\begin{frame}
+    
+\begin{algorithm}[H]
+    \caption{LM algorithm parameter update}
+\begin{algorithmic}[1]
+    \STATE $\lambda_{0} = \mathrm{\lambda}_{o}$ \\
+    Calculate $\boldsymbol{h_{lm}}$ and $\rho$
+    \IF{$\rho_{i}(\boldsymbol{h_{lm}}) > \epsilon_{4}$}
+        \STATE $\boldsymbol{p} \leftarrow \boldsymbol{p} + \boldsymbol{h_{lm}}$;
+        \STATE $\lambda_{i+1} = \max\left[\lambda_{i}/L_{down}, 10^{-7}\right]$
+    \ELSE
+        \STATE $\lambda_{i+1} = \min\left[\lambda_{i} L_{up}, 10^{7}\right]$
+    \ENDIF
+\label{alg:seq}
+\end{algorithmic}
+\end{algorithm}
+
+Where
+\begin{equation*}
+\rho_{i}(\boldsymbol{h_{lm}}) = \frac{\chi^{2}(\boldsymbol{p})-\chi^{2}\left(\boldsymbol{p}+\boldsymbol{h}_{\mathrm{lm}}\right)}
+      {\boldsymbol{h}_{\operatorname{lm}}^{\top}\left(\lambda_{i} \operatorname{diag}\left(\boldsymbol{J}^{\top} \boldsymbol{W} J\right) \boldsymbol{h}_{\mathrm{lm}}
+      +\boldsymbol{J}^{\top} \boldsymbol{W}(\boldsymbol{y}
+      -\hat{\boldsymbol{y}}(\boldsymbol{p}))\right)}
+\end{equation*}
+
+   
+\end{frame}
+
+\begin{frame}
+    \frametitle{Jacobian updade}
+
+    For every $2n$ interation where $\chi^{2}(\boldsymbol{p}+\boldsymbol{h})>\chi^{2}(\boldsymbol{p})$
+    forward or central difference is calculated for Jacobian
+    \begin{eqnarray*}
+        J_{i j}
+        =\frac{\partial \hat{y}_{i}}{\partial p_{j}}
+            =\frac{\hat{y}\left(t_{i} ; \boldsymbol{p}+\delta \boldsymbol{p}_{j}\right)-\hat{y}\left(t_{i} ; \boldsymbol{p}\right)}
+            {\left\|\delta \boldsymbol{p}_{j}\right\|} \\
+        %%%
+        J_{i j}=\frac{\partial \hat{y}_{i}}{\partial p_{j}}
+        =\frac{\hat{y}\left(t_{i} ; \boldsymbol{p}+\delta \boldsymbol{p}_{j}\right)-\hat{y}\left(t_{i} ; \boldsymbol{p}-\delta \boldsymbol{p}_{j}\right)}
+        {2\left\|\delta \boldsymbol{p}_{j}\right\|}
+    \end{eqnarray*}
+    For intermediate iterations Broyden's rank-1 update formula is used in order not to make expensive calculations
+    on every interation.
+    \begin{equation*}
+        \boldsymbol{J^{i+1}}=\boldsymbol{J^{i}}+\frac{(\hat{\boldsymbol{y}}(\boldsymbol{p}
+                                                                        +\boldsymbol{h})
+                                    -\hat{\boldsymbol{y}}(\boldsymbol{p})-\boldsymbol{J^{i}} \boldsymbol{h}) \boldsymbol{h}^{\top}}
+                            {\boldsymbol{h}^{\top} \boldsymbol{h}}
+    \end{equation*}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \begin{lstlisting}[language=Python]
+    @torch.no_grad()
+    def broyden_jacobian_update(self):
+        '''
+        Broyden 1-rank Jacobian update
+        '''
+        df = self.func(self.p + self.dp) - self.func(self.p)
+        self.J += torch.outer(df - torch.mv(self.J, self.dp),
+                                self.dp) \
+                            .div(torch.linalg.norm(self.dp, ord=2))
+    @torch.no_grad()    
+    def torch_jacobian_update(self, p):
+        '''
+        Finite-difference Jacobian update
+        '''
+        self.J = torch.autograd.functional.jacobian(self.func, p)
+        \end{lstlisting}
+\end{frame}
+
+
+\begin{frame}[fragile]
+    \begin{lstlisting}[language=Python]
+    @torch.no_grad()        
+    def solve_for_dp(self):
+        '''
+        Solver for optimizer step
+        '''
+        self.JTW = torch.matmul(torch.transpose(self.J, 0, 1),
+                                    self.W)
+        self.JTWJ =  torch.matmul(self.JTW, self.J)
+        
+        dy =  self.y_data - self.func(self.p)
+        self.dp = torch.linalg.solve(self.JTWJ 
+                                    + self.lambda_lm 
+                                    * torch.diag(
+                                        torch.diagonal(self.JTWJ)
+                                                ), 
+                                    torch.mv(self.JTW , dy)
+                                    )
+    
+    \end{lstlisting}
+\end{frame}
+
+
+
 
 
 \subsection{SABR model}
